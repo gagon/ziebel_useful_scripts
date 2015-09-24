@@ -3,31 +3,30 @@
 """ =============================HEADER============================================ """
 
 
-fftrawout_file =  r'W:\Data\CoP\A-05\DAS\fft_test\proc1\2014.08.18.09.33.21.hdf_rechunked2.hdf'
+#fftrawout_file =  r'D:\COP_BF17\2015.08.06.00.12.02.hdf'
+fftrawout_file =  r'W:\Data\CoP\A-05\DAS\fft_test\proc1\2014.08.18.09.33.21.hdf'
+#img_file =  r'D:\COP_BF17\img_out\img_file.hdf'
 img_file =  r'D:\COP_A05\img_file.hdf'
 
 prf = 5000
 
 # plots to make
-tf_depths=[
-            5224,5420,5857,6392
-        ]
+tf_depths=[]
 
 td_freqs=[
-            [100,500]
+            [10,50]
         ]
         
 df_times=[
-            
-            0
-            
         ]
 
 
+
+
 # for tf and df data
-freq_lim=-1
-depth_lim=[4000,7800]
-time_lim=[0,500]
+freq_lim=[0,1000]
+depth_lim=[0,1500]
+time_lim=[0,1000]
 
 # colormap lims
 vmin=0.0
@@ -48,8 +47,13 @@ default_dpi=100
 
 import numpy as np
 import h5py as h5
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib import colors
 import gc
 import os
+import sys
+from PIL import Image
 import datetime
 
 
@@ -64,6 +68,37 @@ def chunking(lim,chunk_size):
         total_chunks=chunks
     return [chunks,chunks_tail,total_chunks,lim,chunk_size]
     
+
+
+def data_to_img_arr(data,img_type,vmin,vmax):
+    if img_type=='plt':
+        fig = plt.figure(frameon=False)
+        fig.set_size_inches(1,1)
+        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        fig.add_axes(ax)            
+        ax.imshow(data,aspect='auto',interpolation='none',vmin=vmin,vmax=vmax)                       
+        fig.savefig(os.path.join(img_file_folder,'buffer.png'),dpi=int(default_dpi/img_dpi_defac))             
+        fig.clf()
+        plt.close()                        
+        img_pil=Image.open(os.path.join(img_file_folder,'buffer.png'))
+        img_arr=np.asarray(img_pil)
+        
+    elif img_type=='cm':            
+        normalizer = colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+        colormap = cm.get_cmap(name='jet')
+        colormap.set_bad('k', 1.0) # sets black color for NaN etc
+        sm = cm.ScalarMappable(norm=normalizer, cmap=colormap)
+        img_arr = sm.to_rgba(data, bytes=False)
+
+    elif img_type=='int':
+        img_arr=np.array(np.rint(data),dtype='int8') 
+
+    
+    return img_arr
+
+
+
 
 
 def make_imgs(plot_type,global_cnt,plot_vars,x_par,y_par,vmin,vmax,img_type):
@@ -116,24 +151,27 @@ def make_imgs(plot_type,global_cnt,plot_vars,x_par,y_par,vmin,vmax,img_type):
                                                                       
                     if plot_type=='tf':                               
                         hdf_data=F['data'][from_x_idx:to_x_idx, i[0]:i[1], from_y_idx:to_y_idx]
-                        data=np.mean(hdf_data,axis=1).T
+                        data=np.mean(10.0*np.log10(hdf_data),axis=1).T
                     elif plot_type=='td':
                         hdf_data=F['data'][from_x_idx:to_x_idx, from_y_idx:to_y_idx, i[0]:i[1]]
-                        data=np.mean(hdf_data,axis=2).T
+                        data=np.mean(10.0*np.log10(hdf_data),axis=2).T
                     elif plot_type=='df':
                         hdf_data=F['data'][i[0]:i[1],from_x_idx:to_x_idx, from_y_idx:to_y_idx]
-                        data=np.mean(hdf_data,axis=0)
+                        data=np.mean(10.0*np.log10(hdf_data),axis=0)
                         
                 else:
                                              
                     if plot_type=='tf':                               
-                        data=np.array(F['data'][from_x_idx:to_x_idx, i, from_y_idx:to_y_idx]).T
+                        hdf_data=F['data'][from_x_idx:to_x_idx, i, from_y_idx:to_y_idx]
+                        data=np.array(10.0*np.log10(np.array(hdf_data))).T
                     elif plot_type=='td':
-                        data=np.array(F['data'][from_x_idx:to_x_idx, from_y_idx:to_y_idx, i]).T
+                        hdf_data=F['data'][from_x_idx:to_x_idx, from_y_idx:to_y_idx, i]
+                        data=np.array(10.0*np.log10(np.array(hdf_data))).T
                     elif plot_type=='df':
-                        data=np.array(F['data'][i,from_x_idx:to_x_idx, from_y_idx:to_y_idx])
+                        hdf_data=F['data'][i,from_x_idx:to_x_idx, from_y_idx:to_y_idx]
+                        data=np.array(10.0*np.log10(np.array(hdf_data)))                                        
                
-
+                img_arr=data_to_img_arr(data,img_type,vmin,vmax)                                    
                 
                 # create dataset and put numpy array image there
                 if type(i) is list: 
@@ -141,7 +179,7 @@ def make_imgs(plot_type,global_cnt,plot_vars,x_par,y_par,vmin,vmax,img_type):
                 else:
                     ds_str='/'+plot_type+'/'+str(i)+'/'+str(ds_cnt)                                    
 
-                img_hdf.create_dataset(ds_str,data=data)
+                img_hdf.create_dataset(ds_str,data=img_arr)
                 
                 if plot_type=='tf':                    
                     img_hdf[ds_str].attrs['depth']=i

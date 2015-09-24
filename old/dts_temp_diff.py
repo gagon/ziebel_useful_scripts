@@ -10,8 +10,8 @@ Created on Tue Apr 14 08:49:59 2015
 
 
 
-main_dir=r'/mnt/A4-Data1/Data/Daleel/BR-21/DTS/Calibrated_DTS/BR-21_cal_dts/BR-21_dts_merged_v2.hdf'
-cmap_lims=[-5.0,5.0]
+main_dir=r'L:\Data\Daleel\BR-21\DTS\Calibrated_DTS\New\BR-21_cal_dts\BR-21_dts_merged.hdf'
+cmap_lims=[-1.0,1.0]
 colormap='jet'
 hdf_group='Merged'
 
@@ -96,7 +96,7 @@ for i,d in enumerate(data):
     else:
         trace=[]
         for j in range(len(d[1][1])):
-            trace.append(data[i-1][1][1][j]-init_trace[j])
+            trace.append(init_trace[j]-data[i-1][1][1][j])
         temp_diff.append(trace)
         time_collection.append(mdates.date2num(d[0]))
 

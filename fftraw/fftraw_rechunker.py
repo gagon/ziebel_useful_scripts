@@ -10,21 +10,24 @@ Created on Wed Sep 09 14:42:36 2015
 """ =============================HEADER============================================ """
 
 
-fftrawout_file =  r'D:\COP_BF17/2015.08.06.00.12.02.hdf'
-rechunked_file =  r'D:\COP_BF17/2015.08.06.00.12.02_rechunked2.hdf'
+fftrawout_file =  r'Z:\Data\Ziebel_test_data\Tatiana\fftraw_processed\PineOil1.2014.05.30.13.02.33.hdf'
+rechunked_file =  r'Z:\Data\Ziebel_test_data\Tatiana\fftraw_processed\PineOil1.2014.05.30.13.02.33_rechunk_denoise.hdf'
 
 # for tf and df data
 freq_lim=-1
 depth_lim=-1
-time_lim=-1
+time_lim=[0,500]
 
-time_chunk_size=4642
-depth_chunk_size=5782
+time_chunk_size=9076
+depth_chunk_size=128
 freq_chunk_size=1
 
 time_rechunk_size=100
 depth_rechunk_size=100
 freq_rechunk_size=100
+
+denoise=[4500,4520]
+#denoise=None
 
 
 
@@ -37,12 +40,8 @@ freq_rechunk_size=100
 import h5py
 import numpy as np
 import gc
+from numpy import zeros, newaxis
 
-#dummy_file=r'D:\COP_A05\dummy.hdf'
-#dummy_hdf=h5py.File(dummy_file, 'w-')
-#d=np.random.rand(100,100,100)
-#dummy_hdf.create_dataset('/data',data=d,chunks=(10,10,10))
-#dummy_hdf.close()
 
 
 original_hdf = h5py.File(fftrawout_file,'r')
@@ -100,7 +99,14 @@ def rechunk(global_cnt,x_par,y_par,z_par):
                 to_y_idx=from_y_idx+y_chunks_tail
             else:
                 to_y_idx=from_y_idx+y_chunk_size
-
+            
+            # define noise floor is applied
+            if denoise:
+                noise_floor=10.0*np.log10(np.mean(np.array(\
+                                        original_hdf['data']\
+                                        [from_x_idx:to_x_idx, from_y_idx:to_y_idx, denoise[0]:denoise[1]]),\
+                                        axis=2))[:,:,newaxis]
+                print 'denoise'
 
             # z dimension loop
             for z in range(total_z_chunks):                                      
@@ -110,13 +116,16 @@ def rechunk(global_cnt,x_par,y_par,z_par):
                 else:
                     to_z_idx=from_z_idx+z_chunk_size
 
-
                 print '%i/%i chunks / x(%s,%s) / y(%s,%s) / x(%s,%s)' % \
                             (global_cnt+1,total_cnt,from_x_idx,to_x_idx,from_y_idx,to_y_idx,from_z_idx,to_z_idx)
- 
-            
+             
                 data=original_hdf['data'][from_x_idx:to_x_idx, from_y_idx:to_y_idx, from_z_idx:to_z_idx]
-                data=np.array(np.rint(10.0*np.log10(np.array(data))),dtype='int8')
+
+                if denoise:
+                    data=np.array(np.rint(10.0*np.log10(np.array(data))-noise_floor),dtype='int8')
+                else:
+                    data=np.array(np.rint(10.0*np.log10(np.array(data))),dtype='int8')
+                    
                 if ds_cnt==0:
                     rechunked_hdf.create_dataset('/data',data=data,\
                                             chunks=(time_rechunk_size,depth_rechunk_size,freq_rechunk_size),\
